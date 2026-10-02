@@ -19,19 +19,19 @@ Launch the dashboard and browser automatically with a single click:
 
 ---
 
-## 🔗 Hybrid Architecture: Offline-First + NovaPOS SQLite Bridge
+## 🔗 Hybrid Architecture & Automatic NovaPOS Integration
 
-NovaMetrics was designed with an **enterprise hybrid data layer**:
+NovaMetrics is engineered with an **intelligent commercial data layer**:
 
-### 1. 🛡️ 100% Standalone & Offline-First (IndexedDB)
-- Uses the browser's native **IndexedDB** (`NovaMetricsDB`) for instant zero-setup persistence.
-- Automatically seeds 30 days of realistic retail sales history and operational expenses (rent, utilities, payroll, wholesale restock) on the first launch.
-- No database server or backend is required for local evaluation or static hosting (e.g. GitHub Pages).
+### 1. 🔄 Automatic NovaPOS Discovery & Shared SQLite Database
+- **Zero-Config Auto-Detection**: When launched alongside **[NovaPOS Terminal (WEB_POS)](https://github.com/cloud-humberto/WEB_POS)**, the backend (`server/db.js`) automatically detects and connects directly to `pdv-vue2/server/database.sqlite`.
+- **Concurrent Multi-Process WAL Mode**: SQLite **Write-Ahead Logging** (`PRAGMA journal_mode = WAL;`) enables both NovaPOS and NovaMetrics to concurrently read and write to the same database file with zero file locking or conflicts.
+- **Real-Time Retail Feeds**: Every sale finalized in NovaPOS (`[F4] Tender`) is instantly queried by the dashboard—feeding Gross Inflow, top products, payment tender mix, and net profit margins without manual export/import.
+- **Live Terminal Monitor**: The top header badge dynamically detects if the NovaPOS terminal is actively running (`🟢 NovaPOS Terminal Active`) or stopped (`🔵 Shared SQLite Connected`).
 
-### 2. ⚡ Live NovaPOS SQLite Synchronization (Port 3001)
-- Auto-probes the **NovaPOS (`pdv-vue2`)** SQLite Express backend on port `3001`.
-- When NovaPOS is online, a green status badge lights up: `● NovaPOS Online (Port 3001)`.
-- Clicking **"Sync POS Sales"** pulls new checkout receipts directly from the SQLite database into your financial ledger with zero duplicates.
+### 2. 🛡️ 100% Standalone Autonomy (SQLite + IndexedDB Fallback)
+- **Runs Completely Alone**: If NovaPOS is not present, NovaMetrics automatically creates its own independent SQLite database (`server/database.sqlite`) with complete commercial schemas (`products`, `sales`, `sale_items`, `expenses`, `users`) and seeded baseline data.
+- **Static / Serverless Fallback**: If the Node.js backend is offline (e.g. static preview or GitHub Pages), the dashboard seamlessly switches to browser-native **IndexedDB** (`NovaMetricsDB`).
 
 ---
 
