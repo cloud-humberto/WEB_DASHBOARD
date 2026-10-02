@@ -1,0 +1,22 @@
+{
+  "name": "finance-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "SaaS Financial & Cashflow Analytics Dashboard with Vue 2, Chart.js, IndexedDB and NovaPOS SQLite Sync",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "chart.js": "^4.4.7",
+    "jspdf": "^4.2.1",
+    "vue": "^2.7.16",
+    "vuex": "^3.6.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue2": "^2.3.3",
+    "vite": "^5.4.11"
+  }
+}
