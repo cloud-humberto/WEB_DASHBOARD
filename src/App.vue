@@ -4,10 +4,9 @@
     <HeaderBar
       @open-pos-modal="showPosModal = true"
       @open-expense-modal="showExpenseModal = true"
-      @sync-pos="handleSyncPos"
+      @refresh-data="handleRefresh"
       @export-pdf="handleExportPdf"
       @export-csv="handleExportCsv"
-      @reset-baseline="handleResetBaseline"
     />
 
     <!-- Main Content Body -->
@@ -86,7 +85,7 @@ export default {
     return {
       showExpenseModal: false,
       showPosModal: false,
-      probeInterval: null
+      pollInterval: null
     };
   },
   computed: {
@@ -94,39 +93,26 @@ export default {
     ...mapGetters('finance', ['kpis', 'filteredTransactions'])
   },
   async mounted() {
-    // 1. Initialize IndexedDB data
+    // 1. Initial Load of shared SQLite data
     await this.loadFinanceData();
 
-    // 2. Initial POS connection probe
-    await this.checkPosStatus();
-
-    // 3. Periodic probe every 12 seconds
-    this.probeInterval = setInterval(() => {
-      this.checkPosStatus();
-    }, 12000);
+    // 2. Poll every 8 seconds to capture new NovaPOS checkout receipts live
+    this.pollInterval = setInterval(() => {
+      this.loadFinanceData();
+    }, 8000);
   },
   beforeDestroy() {
-    if (this.probeInterval) {
-      clearInterval(this.probeInterval);
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
     }
   },
   methods: {
     ...mapActions('finance', {
-      loadFinanceData: 'loadData',
-      resetFinanceData: 'resetBaseline'
-    }),
-    ...mapActions('pos', {
-      checkPosStatus: 'checkConnection',
-      syncSalesWithDashboard: 'syncSalesWithDashboard'
+      loadFinanceData: 'loadData'
     }),
 
-    async handleSyncPos() {
-      try {
-        const stats = await this.syncSalesWithDashboard();
-        alert(`POS Sync Complete!\n- ${stats.importedCount} new receipts imported\n- ${stats.skippedCount} already up to date`);
-      } catch (err) {
-        alert('Could not sync with NovaPOS. Make sure NovaPOS backend is running on port 3001.');
-      }
+    async handleRefresh() {
+      await this.loadFinanceData();
     },
 
     handleExportCsv() {
@@ -141,13 +127,6 @@ export default {
         'all': 'All Time History'
       };
       exportExecutivePdf(this.kpis, this.filteredTransactions, periodLabels[this.filterPeriod] || 'Custom');
-    },
-
-    async handleResetBaseline() {
-      const conf = confirm('Reset IndexedDB database to standard retail demo baseline?');
-      if (conf) {
-        await this.resetFinanceData();
-      }
     }
   }
 };

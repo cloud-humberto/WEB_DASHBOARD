@@ -3,15 +3,16 @@
     <div class="modal-content">
       <div class="modal-header">
         <div class="modal-title-wrapper">
-          <div class="icon-wrap" :class="isPosOnline ? 'emerald' : 'muted'">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-              <circle cx="12" cy="7" r="4"></circle>
+          <div class="icon-wrap" :class="isSqlConnected ? 'emerald' : 'muted'">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+              <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+              <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
             </svg>
           </div>
           <div>
-            <h3 class="modal-title">NovaPOS SQLite Integration</h3>
-            <span class="modal-subtitle">Live bridge with retail Point of Sale system</span>
+            <h3 class="modal-title">Shared SQLite Database & POS Link</h3>
+            <span class="modal-subtitle">Unified relational storage with NovaPOS</span>
           </div>
         </div>
         <button class="btn-close" @click="$emit('close')">&times;</button>
@@ -19,93 +20,70 @@
 
       <div class="modal-body">
         <!-- Live Connection Status Box -->
-        <div class="status-box" :class="isPosOnline ? 'online' : 'offline'">
+        <div class="status-box" :class="isSqlConnected ? 'online' : 'offline'">
           <div class="status-left">
             <span class="status-indicator-dot"></span>
             <div>
               <div class="status-title">
-                {{ isPosOnline ? 'NovaPOS SQLite Backend Connected' : 'NovaPOS Backend Not Detected' }}
+                {{ isSqlConnected ? 'Shared SQLite Database Connected' : 'SQLite Server Not Detected' }}
               </div>
               <div class="status-desc mono">
-                {{ isPosOnline ? 'API Target: http://localhost:3001' : 'Offline / Standalone IndexedDB Mode Active' }}
+                {{ dbPath || 'Using Local IndexedDB' }}
               </div>
             </div>
           </div>
           <button
             class="btn btn-secondary btn-sm"
-            :disabled="isChecking"
-            @click="handleCheckConnection"
+            @click="handleRefresh"
           >
-            {{ isChecking ? 'Checking...' : 'Probe API' }}
+            Probe DB
           </button>
         </div>
 
-        <!-- If Online: POS SQLite Stats -->
-        <div v-if="isPosOnline" class="pos-stats-section">
-          <h4 class="section-title">LIVE RETAIL METRICS (FROM SQLITE)</h4>
-          <div class="pos-stats-grid" v-if="posSummary">
-            <div class="stat-item">
-              <span class="stat-label">TOTAL SALES TODAY</span>
-              <span class="stat-val mono">{{ posSummary.total_sales_count || 0 }}</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">GROSS REVENUE</span>
-              <span class="stat-val mono text-emerald">{{ formatCurrency(posSummary.gross_sales) }}</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">TOTAL DISCOUNTS</span>
-              <span class="stat-val mono text-rose">{{ formatCurrency(posSummary.total_discounts) }}</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">TOTAL TAX</span>
-              <span class="stat-val mono text-amber">{{ formatCurrency(posSummary.total_tax) }}</span>
-            </div>
-          </div>
-
-          <div class="sync-action-box">
-            <p class="sync-desc">
-              Import all retail checkout receipts into your NovaMetrics dashboard. Duplicate receipts are automatically skipped.
-            </p>
-            <button
-              class="btn btn-emerald"
-              :disabled="isSyncing"
-              @click="handleSync"
+        <!-- POS Terminal Link Status -->
+        <div class="pos-link-card">
+          <div class="pos-link-header">
+            <span class="section-title">NOVAPOS TERMINAL STATUS</span>
+            <span
+              class="badge"
+              :class="posStatus && posStatus.isPosOnline ? 'badge-emerald' : 'badge-subtle'"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-              </svg>
-              {{ isSyncing ? 'Importing Receipts...' : 'Synchronize POS Sales Now' }}
-            </button>
-          </div>
-
-          <!-- Last Sync Results -->
-          <div v-if="lastSyncStats" class="sync-results mono">
-            <span class="text-emerald">✓ {{ lastSyncStats.importedCount }} new receipts imported</span>
-            <span v-if="lastSyncStats.skippedCount > 0" class="text-muted">
-              ({{ lastSyncStats.skippedCount }} already up-to-date)
+              {{ posStatus && posStatus.isPosOnline ? 'RUNNING (PORT 3000/3001)' : 'TERMINAL STOPPED' }}
             </span>
           </div>
+          <p class="pos-link-desc">
+            Whenever a cashier checks out an order in NovaPOS, it is written immediately to this shared SQLite database, and automatically flows into this dashboard.
+          </p>
         </div>
 
-        <!-- If Offline: Explanation on how to start POS -->
-        <div v-else class="offline-guide">
-          <h4 class="section-title">HOW TO CONNECT TO NOVAPOS:</h4>
-          <p class="guide-text">
-            NovaMetrics works 100% offline using your browser's IndexedDB. To synchronize real-time sales with your NovaPOS register:
-          </p>
-          <ol class="guide-steps">
-            <li>
-              Navigate to the <code>pdv-vue2/</code> folder and run <code>START-POS.bat</code> (or double-click the <strong>NovaPOS Terminal</strong> desktop shortcut).
-            </li>
-            <li>
-              NovaPOS will start its native SQLite backend server on port <code>3001</code>.
-            </li>
-            <li>
-              Return to this dashboard and click <strong>Probe API</strong> to link live receipts!
-            </li>
-          </ol>
+        <!-- Shared SQLite Statistics -->
+        <div class="pos-stats-section" v-if="posStatus && posStatus.stats">
+          <h4 class="section-title">DATABASE ENTITIES IN SQLITE</h4>
+          <div class="pos-stats-grid">
+            <div class="stat-item">
+              <span class="stat-label">RETAIL SALES</span>
+              <span class="stat-val mono text-emerald">{{ posStatus.stats.salesCount }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">OPERATING EXPENSES</span>
+              <span class="stat-val mono text-rose">{{ posStatus.stats.expensesCount }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">PRODUCTS IN CATALOG</span>
+              <span class="stat-val mono text-blue">{{ posStatus.stats.productsCount }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">SQLITE CONCURRENCY</span>
+              <span class="stat-val mono text-amber">WAL MODE</span>
+            </div>
+          </div>
+
+          <!-- Latest Sale in Database -->
+          <div v-if="posStatus.lastSale" class="last-sale-box mono">
+            <span class="text-secondary">Latest Checkout:</span>
+            <span class="text-emerald font-bold">Receipt #{{ posStatus.lastSale.sale_number }}</span>
+            <span class="text-muted">({{ formatCurrency(posStatus.lastSale.total_amount) }} - {{ posStatus.lastSale.operator_name }})</span>
+          </div>
         </div>
       </div>
 
@@ -125,22 +103,14 @@ import { formatCurrency } from '@/utils/formatters';
 export default {
   name: 'ModalPosSync',
   computed: {
-    ...mapState('pos', ['isPosOnline', 'isChecking', 'isSyncing', 'lastSyncStats', 'posSummary'])
+    ...mapState('finance', ['isSqlConnected', 'dbPath', 'posStatus'])
   },
   methods: {
-    ...mapActions('pos', ['checkConnection', 'syncSalesWithDashboard']),
+    ...mapActions('finance', ['loadData']),
     formatCurrency,
 
-    async handleCheckConnection() {
-      await this.checkConnection();
-    },
-
-    async handleSync() {
-      try {
-        await this.syncSalesWithDashboard();
-      } catch (err) {
-        alert('Sync error: ' + err.message);
-      }
+    async handleRefresh() {
+      await this.loadData();
     }
   }
 };
@@ -211,7 +181,7 @@ export default {
   justify-content: space-between;
   padding: 14px 18px;
   border-radius: var(--radius-md);
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 .status-box.online {
   background: rgba(16, 185, 129, 0.08);
@@ -250,6 +220,28 @@ export default {
 .status-desc {
   font-size: 11px;
   color: var(--text-muted);
+  word-break: break-all;
+}
+
+.pos-link-card {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.pos-link-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.pos-link-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
 }
 
 .section-title {
@@ -257,14 +249,14 @@ export default {
   font-weight: 800;
   color: var(--text-muted);
   letter-spacing: 0.6px;
-  margin-bottom: 12px;
 }
 
 .pos-stats-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-  margin-bottom: 20px;
+  margin-top: 10px;
+  margin-bottom: 16px;
 }
 
 .stat-item {
@@ -283,69 +275,21 @@ export default {
 }
 
 .stat-val {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 800;
   margin-top: 4px;
 }
 
-.sync-action-box {
+.last-sale-box {
   background: var(--bg-subtle);
   border: 1px solid var(--border-subtle);
+  padding: 8px 14px;
   border-radius: var(--radius-md);
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.sync-desc {
-  font-size: 12px;
-  color: var(--text-secondary);
-  line-height: 1.4;
-}
-
-.sync-results {
-  margin-top: 12px;
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-subtle);
-  border: 1px solid var(--border-subtle);
   font-size: 12px;
   display: flex;
   gap: 8px;
-}
-
-/* Offline Guide */
-.offline-guide {
-  background: var(--bg-subtle);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 16px;
-}
-
-.guide-text {
-  font-size: 12px;
-  color: var(--text-secondary);
-  line-height: 1.5;
-  margin-bottom: 12px;
-}
-
-.guide-steps {
-  font-size: 12px;
-  color: var(--text-secondary);
-  padding-left: 20px;
-  line-height: 1.6;
-}
-.guide-steps li {
-  margin-bottom: 6px;
-}
-.guide-steps code {
-  background: var(--bg-elevated);
-  padding: 2px 6px;
-  border-radius: 4px;
-  color: var(--text-primary);
-  font-family: var(--font-mono);
-  font-size: 11px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .modal-footer {

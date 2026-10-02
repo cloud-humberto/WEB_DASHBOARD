@@ -38,18 +38,16 @@ if not exist "node_modules\" (
     )
 )
 
-echo [*] Starting NovaMetrics Financial Dashboard on port 3002...
+echo [*] Starting NovaMetrics SQLite Backend & Vue 2 Dashboard...
 echo [*] Terminal will open automatically in your browser...
 echo.
 echo ========================================================
-echo  INTEGRATION STATUS:
-echo   - Standalone / Offline Mode: Active (IndexedDB)
-echo   - NovaPOS SQLite API:        Auto-detecting on port 3001
+echo  DATABASE LINK STATUS:
+echo   - Shared SQLite Database: pdv-vue2/server/database.sqlite
+echo   - Backend Analytics API:  http://localhost:3003
+echo   - Frontend Dashboard:     http://localhost:3002
 echo ========================================================
 echo.
 
-:: Open browser after 2 seconds in background
-start "" /b cmd /c "timeout /t 2 /nobreak >nul & start http://localhost:3002"
-
-call npm run dev
+node server/start-all.js
 pause

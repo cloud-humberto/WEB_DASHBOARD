@@ -3,14 +3,18 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "SaaS Financial & Cashflow Analytics Dashboard with Vue 2, Chart.js, IndexedDB and NovaPOS SQLite Sync",
+  "description": "SaaS Financial & Cashflow Analytics Dashboard with Vue 2, Chart.js, Unified SQLite and NovaPOS Integration",
   "scripts": {
+    "start": "node server/start-all.js",
+    "server": "node server/index.js",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
     "chart.js": "^4.4.7",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
     "jspdf": "^4.2.1",
     "vue": "^2.7.16",
     "vuex": "^3.6.2"

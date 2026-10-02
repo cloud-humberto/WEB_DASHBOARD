@@ -15,33 +15,22 @@
         </div>
       </div>
 
-      <!-- POS Live Connection Status Badge -->
-      <div class="pos-status-badge" :class="connectionBadge.status" @click="$emit('open-pos-modal')">
+      <!-- POS & SQLite Live Link Status Badge -->
+      <div
+        class="pos-status-badge"
+        :class="statusClass"
+        @click="$emit('open-pos-modal')"
+        :title="statusTooltip"
+      >
         <span class="pulse-dot"></span>
-        <span class="status-text">{{ connectionBadge.text }}</span>
-        <span class="status-action" v-if="isPosOnline">MANAGE &bull;</span>
-        <span class="status-action" v-else>OFFLINE &bull;</span>
+        <span class="status-text">{{ statusText }}</span>
+        <span class="status-action">&bull; VIEW DB</span>
       </div>
 
       <!-- Quick Action Buttons -->
       <div class="actions-group">
         <button
-          v-if="isPosOnline"
           class="btn btn-emerald btn-sm"
-          :disabled="isSyncing"
-          @click="$emit('sync-pos')"
-          title="Import latest retail receipts directly from NovaPOS SQLite database"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="7 10 12 15 17 10"></polyline>
-            <line x1="12" y1="15" x2="12" y2="3"></line>
-          </svg>
-          {{ isSyncing ? 'Syncing...' : 'Sync POS Sales' }}
-        </button>
-
-        <button
-          class="btn btn-secondary btn-sm"
           @click="$emit('open-expense-modal')"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -53,10 +42,23 @@
 
         <button
           class="btn btn-secondary btn-sm"
+          @click="$emit('refresh-data')"
+          title="Refresh database records"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+          Refresh
+        </button>
+
+        <button
+          class="btn btn-secondary btn-sm"
           @click="$emit('export-pdf')"
           title="Generate Executive Financial Statement PDF"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
             <polyline points="14 2 14 8 20 8"></polyline>
             <line x1="16" y1="13" x2="8" y2="13"></line>
@@ -71,23 +73,12 @@
           @click="$emit('export-csv')"
           title="Download transactions CSV spreadsheet"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
             <polyline points="7 10 12 15 17 10"></polyline>
             <line x1="12" y1="15" x2="12" y2="3"></line>
           </svg>
           CSV
-        </button>
-
-        <button
-          class="btn btn-ghost btn-sm"
-          @click="$emit('reset-baseline')"
-          title="Reset IndexedDB baseline sample data"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="1 4 1 10 7 10"></polyline>
-            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-          </svg>
         </button>
       </div>
     </div>
@@ -108,15 +99,19 @@
       </div>
 
       <div class="stats-preview mono text-muted">
-        <span v-if="isPosOnline" class="text-emerald">Live SQLite Backend Connected</span>
-        <span v-else>IndexedDB Offline Persistence Active</span>
+        <span v-if="isSqlConnected" class="text-emerald">
+          🗄️ Shared SQLite Database: <code>pdv-vue2/server/database.sqlite</code>
+        </span>
+        <span v-else>
+          IndexedDB Offline Persistence Active
+        </span>
       </div>
     </div>
   </header>
 </template>
 
 <script>
-import { mapState, mapGetters, mapMutations } from 'vuex';
+import { mapState, mapMutations, mapActions } from 'vuex';
 
 export default {
   name: 'HeaderBar',
@@ -131,14 +126,33 @@ export default {
     };
   },
   computed: {
-    ...mapState('finance', ['filterPeriod']),
-    ...mapState('pos', ['isPosOnline', 'isSyncing']),
-    ...mapGetters('pos', ['connectionBadge'])
+    ...mapState('finance', ['filterPeriod', 'isSqlConnected', 'posStatus']),
+
+    statusClass() {
+      if (!this.isSqlConnected) return 'offline';
+      if (this.posStatus && this.posStatus.isPosOnline) return 'online';
+      return 'connected-db';
+    },
+
+    statusText() {
+      if (!this.isSqlConnected) return 'Offline (IndexedDB)';
+      if (this.posStatus && this.posStatus.isPosOnline) return 'NovaPOS Terminal Active (Port 3000/3001)';
+      return 'Shared SQLite Connected';
+    },
+
+    statusTooltip() {
+      if (this.isSqlConnected) {
+        return 'Connected to shared SQLite database at pdv-vue2/server/database.sqlite';
+      }
+      return 'Using local browser IndexedDB';
+    }
   },
   methods: {
     ...mapMutations('finance', ['SET_FILTER_PERIOD']),
+    ...mapActions('finance', ['loadData']),
     changePeriod(key) {
       this.SET_FILTER_PERIOD(key);
+      this.loadData();
     }
   }
 };
@@ -209,22 +223,15 @@ export default {
   color: var(--accent-emerald);
   border: 1px solid rgba(16, 185, 129, 0.3);
 }
-.pos-status-badge.online:hover {
-  background: rgba(16, 185, 129, 0.25);
-  box-shadow: 0 0 10px var(--accent-emerald-glow);
+.pos-status-badge.connected-db {
+  background: var(--accent-blue-glow);
+  color: var(--accent-blue);
+  border: 1px solid rgba(59, 130, 246, 0.3);
 }
 .pos-status-badge.offline {
   background: var(--bg-elevated);
   color: var(--text-secondary);
   border: 1px solid var(--border-subtle);
-}
-.pos-status-badge.offline:hover {
-  border-color: var(--text-muted);
-}
-.pos-status-badge.loading {
-  background: var(--accent-amber-glow);
-  color: var(--accent-amber);
-  border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
 .pulse-dot {
@@ -233,8 +240,9 @@ export default {
   border-radius: 50%;
   background: currentColor;
 }
-.pos-status-badge.online .pulse-dot {
-  box-shadow: 0 0 8px #10B981;
+.pos-status-badge.online .pulse-dot,
+.pos-status-badge.connected-db .pulse-dot {
+  box-shadow: 0 0 8px currentColor;
   animation: pulse 2s infinite;
 }
 
@@ -247,7 +255,7 @@ export default {
 .status-action {
   font-size: 10px;
   font-weight: 700;
-  opacity: 0.7;
+  opacity: 0.8;
 }
 
 .actions-group {
@@ -304,7 +312,11 @@ export default {
   box-shadow: 0 0 10px var(--accent-blue-glow);
 }
 
-.stats-preview {
-  font-size: 12px;
+.stats-preview code {
+  background: var(--bg-subtle);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
 }
 </style>

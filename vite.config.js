@@ -13,10 +13,14 @@ export default defineConfig({
     port: 3002,
     open: false,
     proxy: {
-      '/pos-api': {
+      '/api': {
+        target: 'http://localhost:3003',
+        changeOrigin: true
+      },
+      '/pos-direct': {
         target: 'http://localhost:3001',
         changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/pos-api/, '')
+        rewrite: (p) => p.replace(/^\/pos-direct/, '')
       }
     }
   }

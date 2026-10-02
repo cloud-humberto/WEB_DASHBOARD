@@ -1,10 +1,5 @@
-import {
-  getAllTransactions,
-  addTransaction,
-  deleteTransaction,
-  clearTransactions,
-  seedInitialDataIfEmpty
-} from '@/services/indexedDb';
+import * as api from '@/services/api';
+import * as indexedDb from '@/services/indexedDb';
 
 export default {
   namespaced: true,
@@ -15,7 +10,10 @@ export default {
     filterType: 'all',   // 'all' | 'revenue' | 'expense' | 'pos_sync'
     categoryFilter: 'all',
     searchQuery: '',
-    isLoading: false
+    isLoading: false,
+    isSqlConnected: false,
+    dbPath: '',
+    posStatus: null
   }),
 
   getters: {
@@ -37,7 +35,7 @@ export default {
       }
 
       return state.transactions.filter((t) => {
-        // Period filter
+        // Period filter (client side refinement if needed)
         if (cutoffDate && new Date(t.date) < cutoffDate) {
           return false;
         }
@@ -234,24 +232,59 @@ export default {
     },
     SET_LOADING(state, val) {
       state.isLoading = val;
+    },
+    SET_SQL_STATUS(state, { connected, dbPath, posStatus }) {
+      state.isSqlConnected = connected;
+      state.dbPath = dbPath || '';
+      state.posStatus = posStatus || null;
     }
   },
 
   actions: {
-    async loadData({ commit }) {
+    async loadData({ commit, state }) {
       commit('SET_LOADING', true);
+
+      // 1. Try querying shared SQLite backend
       try {
-        const data = await seedInitialDataIfEmpty();
-        commit('SET_TRANSACTIONS', data);
+        const status = await api.getSystemStatus();
+        const items = await api.getTransactions(state.filterPeriod);
+        commit('SET_SQL_STATUS', {
+          connected: true,
+          dbPath: status.dbPath,
+          posStatus: status
+        });
+        commit('SET_TRANSACTIONS', items);
+        return;
       } catch (err) {
-        console.error('Failed to load IndexedDB finance data:', err);
+        // Fallback to IndexedDB
+        console.warn('SQLite backend offline, using IndexedDB fallback.');
+        commit('SET_SQL_STATUS', { connected: false, dbPath: '', posStatus: null });
+      }
+
+      // 2. Offline IndexedDB
+      try {
+        const data = await indexedDb.seedInitialDataIfEmpty();
+        commit('SET_TRANSACTIONS', data);
+      } catch (idbErr) {
+        console.error('Failed to load IndexedDB finance data:', idbErr);
       } finally {
         commit('SET_LOADING', false);
       }
     },
 
-    async createExpense({ commit }, expenseData) {
-      const saved = await addTransaction({
+    async createExpense({ commit, state, dispatch }, expenseData) {
+      if (state.isSqlConnected) {
+        try {
+          const res = await api.addExpense(expenseData);
+          await dispatch('loadData');
+          return res.expense;
+        } catch (err) {
+          console.error('Failed to save to SQLite, falling back to IndexedDB:', err);
+        }
+      }
+
+      // Fallback
+      const saved = await indexedDb.addTransaction({
         ...expenseData,
         type: 'expense'
       });
@@ -259,17 +292,26 @@ export default {
       return saved;
     },
 
-    async removeTransaction({ commit }, id) {
-      await deleteTransaction(id);
+    async removeTransaction({ commit, state, dispatch }, id) {
+      if (state.isSqlConnected) {
+        try {
+          await api.removeExpense(id);
+          await dispatch('loadData');
+          return;
+        } catch (e) {
+          console.error('Failed to delete from SQLite:', e);
+        }
+      }
+
+      await indexedDb.deleteTransaction(id);
       commit('REMOVE_TRANSACTION', id);
     },
 
-    async resetBaseline({ commit }) {
+    async resetBaseline({ commit, state, dispatch }) {
       commit('SET_LOADING', true);
       try {
-        await clearTransactions();
-        const fresh = await seedInitialDataIfEmpty();
-        commit('SET_TRANSACTIONS', fresh);
+        await indexedDb.clearTransactions();
+        await dispatch('loadData');
       } finally {
         commit('SET_LOADING', false);
       }
