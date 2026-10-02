@@ -43,8 +43,56 @@ export function getDatabasePath() {
  * Initialize shared database tables
  */
 export function initSharedDatabase() {
-  // 1. Ensure Expenses Table exists in the shared database
+  // 1. Ensure Retail Core Tables exist (in case dashboard runs standalone without pdv-vue2)
   db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      badge_code TEXT UNIQUE NOT NULL,
+      username TEXT UNIQUE NOT NULL,
+      name TEXT NOT NULL,
+      pin_hash TEXT NOT NULL,
+      role TEXT NOT NULL,
+      max_discount REAL NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS products (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      barcode TEXT UNIQUE NOT NULL,
+      name TEXT NOT NULL,
+      price REAL NOT NULL,
+      stock INTEGER NOT NULL,
+      category TEXT NOT NULL,
+      unit TEXT DEFAULT 'EA'
+    );
+
+    CREATE TABLE IF NOT EXISTS sales (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sale_number INTEGER NOT NULL,
+      user_id INTEGER,
+      operator_name TEXT,
+      subtotal REAL NOT NULL,
+      discount_total REAL DEFAULT 0,
+      tax_amount REAL NOT NULL,
+      total_amount REAL NOT NULL,
+      payment_method TEXT NOT NULL,
+      received_amount REAL DEFAULT 0,
+      change_amount REAL DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS sale_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sale_id INTEGER NOT NULL,
+      product_id INTEGER,
+      name TEXT NOT NULL,
+      barcode TEXT NOT NULL,
+      qty INTEGER NOT NULL,
+      unit_price REAL NOT NULL,
+      discount REAL DEFAULT 0,
+      total REAL NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS expenses (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       category TEXT NOT NULL,
