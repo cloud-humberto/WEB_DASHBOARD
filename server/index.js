@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import http from 'node:http';
-import { db, initSharedDatabase, getDatabasePath } from './db.js';
+import { db, initSharedDatabase, getDatabasePath, clearAllDemoData, seedDemoBaseline } from './db.js';
 
 const app = express();
 const PORT = 3003;
@@ -336,6 +336,26 @@ app.delete('/api/expenses/:id', (req, res) => {
     const { id } = req.params;
     db.prepare('DELETE FROM expenses WHERE id = ?').run(Number(id));
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 9. Clear all demo / mock sales and expenses
+app.post('/api/clear-demo-data', (req, res) => {
+  try {
+    const result = clearAllDemoData();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 10. Re-seed demo baseline data
+app.post('/api/seed-demo-data', (req, res) => {
+  try {
+    const result = seedDemoBaseline();
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

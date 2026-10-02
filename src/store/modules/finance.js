@@ -315,6 +315,42 @@ export default {
       } finally {
         commit('SET_LOADING', false);
       }
+    },
+
+    async purgeDemoData({ commit, state, dispatch }) {
+      commit('SET_LOADING', true);
+      try {
+        if (state.isSqlConnected) {
+          await api.clearDemoData();
+          await dispatch('loadData');
+        } else {
+          await indexedDb.clearIndexedDbDemoData();
+          commit('SET_TRANSACTIONS', []);
+        }
+      } catch (err) {
+        console.error('Failed to purge demo data:', err);
+        throw err;
+      } finally {
+        commit('SET_LOADING', false);
+      }
+    },
+
+    async loadDemoData({ commit, state, dispatch }) {
+      commit('SET_LOADING', true);
+      try {
+        if (state.isSqlConnected) {
+          await api.seedDemoData();
+          await dispatch('loadData');
+        } else {
+          const fresh = await indexedDb.seedIndexedDbDemoData();
+          commit('SET_TRANSACTIONS', fresh);
+        }
+      } catch (err) {
+        console.error('Failed to load demo data:', err);
+        throw err;
+      } finally {
+        commit('SET_LOADING', false);
+      }
     }
   }
 };

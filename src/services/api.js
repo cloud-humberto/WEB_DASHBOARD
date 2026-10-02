@@ -56,3 +56,19 @@ export async function removeExpense(id) {
   if (!res.ok) throw new Error('Failed to delete expense');
   return await res.json();
 }
+
+export async function clearDemoData() {
+  const res = await fetch('/api/clear-demo-data', {
+    method: 'POST'
+  });
+  if (!res.ok) throw new Error('Failed to clear demo data');
+  return await res.json();
+}
+
+export async function seedDemoData() {
+  const res = await fetch('/api/seed-demo-data', {
+    method: 'POST'
+  });
+  if (!res.ok) throw new Error('Failed to seed demo data');
+  return await res.json();
+}

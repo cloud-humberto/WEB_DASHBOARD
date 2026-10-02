@@ -168,6 +168,11 @@ export async function clearTransactions() {
  * Seed realistic baseline transactions if DB is empty
  */
 export async function seedInitialDataIfEmpty() {
+  const isCleared = localStorage.getItem('novametrics_demo_cleared') === '1';
+  if (isCleared) {
+    return await getAllTransactions();
+  }
+
   const existing = await getAllTransactions();
   if (existing && existing.length > 0) return existing;
 
@@ -278,4 +283,22 @@ export async function seedInitialDataIfEmpty() {
 
   await bulkAddTransactions(seedItems);
   return getAllTransactions();
+}
+
+/**
+ * Clear all demo transactions from IndexedDB
+ */
+export async function clearIndexedDbDemoData() {
+  localStorage.setItem('novametrics_demo_cleared', '1');
+  await clearTransactions();
+  return [];
+}
+
+/**
+ * Re-seed demo baseline in IndexedDB
+ */
+export async function seedIndexedDbDemoData() {
+  localStorage.removeItem('novametrics_demo_cleared');
+  await clearTransactions();
+  return await seedInitialDataIfEmpty();
 }

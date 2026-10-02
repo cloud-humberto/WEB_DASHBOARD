@@ -30,6 +30,18 @@
       <!-- Quick Action Buttons -->
       <div class="actions-group">
         <button
+          class="btn btn-danger btn-sm"
+          @click="handlePurgeDemo"
+          title="Delete all mock sales and expenses to start with a clean empty database ($0.00)"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+          Clear Mock Data
+        </button>
+
+        <button
           class="btn btn-emerald btn-sm"
           @click="$emit('open-expense-modal')"
         >
@@ -149,10 +161,18 @@ export default {
   },
   methods: {
     ...mapMutations('finance', ['SET_FILTER_PERIOD']),
-    ...mapActions('finance', ['loadData']),
+    ...mapActions('finance', ['loadData', 'purgeDemoData']),
     changePeriod(key) {
       this.SET_FILTER_PERIOD(key);
       this.loadData();
+    },
+    async handlePurgeDemo() {
+      const conf = confirm(
+        '⚠️ DELETE ALL MOCK DATA?\n\nThis will permanently delete all seeded mock sales and expenses from the database.\nYour register will start clean at $0.00.\n\n(Products and User accounts will NOT be deleted).\n\nProceed?'
+      );
+      if (conf) {
+        await this.purgeDemoData();
+      }
     }
   }
 };

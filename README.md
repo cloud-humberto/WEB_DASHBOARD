@@ -33,6 +33,15 @@ NovaMetrics is engineered with an **intelligent commercial data layer**:
 - **Runs Completely Alone**: If NovaPOS is not present, NovaMetrics automatically creates its own independent SQLite database (`server/database.sqlite`) with complete commercial schemas (`products`, `sales`, `sale_items`, `expenses`, `users`) and seeded baseline data.
 - **Static / Serverless Fallback**: If the Node.js backend is offline (e.g. static preview or GitHub Pages), the dashboard seamlessly switches to browser-native **IndexedDB** (`NovaMetricsDB`).
 
+### 3. 🧹 Clean Store Deployment & Mock Data Purge (Reset to $0.00)
+- **Out-of-the-Box Demo Baseline**: Upon fresh installation or initial test run, the app includes 30 days of mock sales and expenses so you can test charts, filters, and reports immediately without having to enter data manually.
+- **1-Click Purge Mock Data**: When ready to deploy in a real store, simply click **`Clear Mock Data`** in the header or inside the Database modal:
+  - Permanently purges all mock sales, receipt line items, and expenses.
+  - Automatically resets financial KPIs and cash register to a clean **`$0.00`** state.
+  - **Zero Data Loss**: Safely preserves the entire product catalog (`products`) and cashier/manager accounts (`users`).
+  - **Persistent Clean State**: Remembers your preference via persistent settings (`demo_cleared = '1'`), ensuring that server restarts or browser refreshes never accidentally restore mock transactions.
+  - **Testing Flexibility**: You can reload sample baseline data at any time via the Database modal (`Reload Demo Baseline Data`).
+
 ---
 
 ## 🎯 Key Dashboard Features

@@ -84,6 +84,36 @@
             <span class="text-emerald font-bold">Receipt #{{ posStatus.lastSale.sale_number }}</span>
             <span class="text-muted">({{ formatCurrency(posStatus.lastSale.total_amount) }} - {{ posStatus.lastSale.operator_name }})</span>
           </div>
+
+          <!-- Demo Data Management Section -->
+          <div class="demo-mgmt-section">
+            <h4 class="section-title">STORE DEPLOYMENT & DATA PURGE</h4>
+            <p class="demo-mgmt-desc">
+              When installing for production retail use, purge all seeded mock sales and expenses to start with an empty ledger ($0.00). User logins and product inventory are safely preserved.
+            </p>
+            <div class="demo-actions">
+              <button
+                class="btn btn-danger btn-sm"
+                @click="handlePurgeDemo"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                Delete Mock Data ($0.00 Clean State)
+              </button>
+              <button
+                class="btn btn-secondary btn-sm"
+                @click="handleLoadDemo"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+                Reload Demo Baseline Data
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -106,11 +136,33 @@ export default {
     ...mapState('finance', ['isSqlConnected', 'dbPath', 'posStatus'])
   },
   methods: {
-    ...mapActions('finance', ['loadData']),
+    ...mapActions('finance', ['loadData', 'purgeDemoData', 'loadDemoData']),
     formatCurrency,
 
     async handleRefresh() {
       await this.loadData();
+    },
+
+    async handlePurgeDemo() {
+      if (confirm('Are you sure you want to purge all demo sales and expenses? This will reset the ledger to $0.00 clean state for real store operations. Catalog products and employee accounts will NOT be deleted.')) {
+        try {
+          await this.purgeDemoData();
+          alert('Mock baseline data purged successfully. Current store ledger is clean ($0.00).');
+        } catch (e) {
+          alert('Failed to purge demo data: ' + e.message);
+        }
+      }
+    },
+
+    async handleLoadDemo() {
+      if (confirm('Reload demo baseline transactions and expenses for testing?')) {
+        try {
+          await this.loadDemoData();
+          alert('Demo baseline data reloaded successfully.');
+        } catch (e) {
+          alert('Failed to reload demo data: ' + e.message);
+        }
+      }
     }
   }
 };
@@ -289,6 +341,26 @@ export default {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
+}
+
+.demo-mgmt-section {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border-subtle);
+}
+
+.demo-mgmt-desc {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin-top: 4px;
+  margin-bottom: 12px;
+}
+
+.demo-actions {
+  display: flex;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
