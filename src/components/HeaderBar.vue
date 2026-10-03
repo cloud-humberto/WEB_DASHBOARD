@@ -352,4 +352,82 @@ export default {
   border: 1px solid var(--border-subtle);
   color: var(--text-primary);
 }
+
+@media (max-width: 768px) {
+  .header-container {
+    padding: 10px 14px;
+  }
+  .header-top {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .brand-section {
+    justify-content: space-between;
+    width: 100%;
+  }
+  .actions-group {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+    gap: 6px;
+    scrollbar-width: none;
+  }
+  .actions-group::-webkit-scrollbar {
+    display: none;
+  }
+  .actions-group .btn {
+    flex-shrink: 0;
+    padding: 6px 10px;
+  }
+  .header-bottom {
+    margin-top: 8px;
+    padding-top: 8px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .period-pills {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .period-pills::-webkit-scrollbar {
+    display: none;
+  }
+  .period-btn {
+    flex-shrink: 0;
+    padding: 4px 10px;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .header-container {
+    padding: 6px 14px;
+  }
+  .brand-logo {
+    width: 28px;
+    height: 28px;
+  }
+  .brand-title {
+    font-size: 15px;
+  }
+  .brand-subtitle {
+    display: none;
+  }
+  .header-bottom {
+    margin-top: 4px;
+    padding-top: 4px;
+  }
+  .actions-group .btn {
+    padding: 3px 8px;
+    font-size: 11px;
+  }
+  .period-btn {
+    padding: 3px 8px;
+    font-size: 11px;
+  }
+}
 </style>

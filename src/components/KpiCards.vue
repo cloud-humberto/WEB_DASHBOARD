@@ -171,4 +171,67 @@ export default {
   font-size: 11px;
   color: var(--text-muted);
 }
+
+@media (max-width: 640px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .kpi-card {
+    padding: 12px 10px;
+  }
+  .kpi-title {
+    font-size: 9.5px;
+  }
+  .kpi-icon-wrapper {
+    width: 26px;
+    height: 26px;
+  }
+  .kpi-icon-wrapper svg {
+    width: 14px;
+    height: 14px;
+  }
+  .kpi-value {
+    font-size: 18px;
+    margin-bottom: 8px;
+  }
+  .kpi-footer {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .kpi-subtitle {
+    font-size: 9.5px;
+  }
+}
+
+@media (max-width: 360px) {
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .kpi-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 8px;
+  }
+  .kpi-card {
+    padding: 8px 10px;
+  }
+  .kpi-value {
+    font-size: 17px;
+    margin-bottom: 4px;
+  }
+  .kpi-header {
+    margin-bottom: 4px;
+  }
+  .kpi-icon-wrapper {
+    width: 24px;
+    height: 24px;
+  }
+  .kpi-icon-wrapper svg {
+    width: 13px;
+    height: 13px;
+  }
+}
 </style>

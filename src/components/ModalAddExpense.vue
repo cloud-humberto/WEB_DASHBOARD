@@ -247,4 +247,30 @@ export default {
   padding-top: 16px;
   border-top: 1px solid var(--border-subtle);
 }
+
+@media (max-width: 640px) {
+  .modal-body {
+    padding: 14px;
+  }
+  .form-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .modal-header {
+    padding: 8px 14px;
+  }
+  .modal-body {
+    padding: 10px 14px;
+  }
+  .form-group {
+    margin-bottom: 8px;
+  }
+  .modal-footer {
+    margin-top: 10px;
+    padding-top: 8px;
+  }
+}
 </style>

@@ -492,4 +492,61 @@ export default {
 
 .text-right { text-align: right; }
 .text-center { text-align: center; }
+
+@media (max-width: 768px) {
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px;
+  }
+  .filter-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    width: 100%;
+  }
+  .filter-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .tab-btn {
+    flex-shrink: 0;
+    padding: 6px 10px;
+  }
+  .toolbar-right {
+    flex-direction: column;
+    width: 100%;
+    gap: 8px;
+  }
+  .select-sm {
+    width: 100%;
+  }
+  .search-box {
+    width: 100%;
+  }
+  .data-table th, .data-table td {
+    padding: 8px 10px;
+    font-size: 11.5px;
+  }
+  .pagination-footer {
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 14px;
+    text-align: center;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .toolbar {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  .data-table th, .data-table td {
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+  .pagination-footer {
+    padding: 6px 12px;
+  }
+}
 </style>

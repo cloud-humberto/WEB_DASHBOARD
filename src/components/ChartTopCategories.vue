@@ -193,4 +193,22 @@ export default {
   height: 240px;
   width: 100%;
 }
+
+@media (max-width: 640px) {
+  .canvas-wrapper {
+    height: 200px;
+  }
+  .chart-title {
+    font-size: 14px;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .canvas-wrapper {
+    height: 160px;
+  }
+  .chart-header {
+    margin-bottom: 6px;
+  }
+}
 </style>

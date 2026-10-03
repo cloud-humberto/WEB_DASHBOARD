@@ -220,6 +220,8 @@ body {
   justify-content: center;
   z-index: 1000;
   padding: 16px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .modal-content {
   background: var(--bg-card);
@@ -227,6 +229,33 @@ body {
   border-radius: var(--radius-lg);
   width: 100%;
   max-width: 540px;
+  max-height: 92vh;
+  max-height: 92dvh;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
-  overflow: hidden;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 640px) {
+  .modal-overlay {
+    padding: 8px;
+  }
+  .card {
+    padding: 14px;
+    border-radius: var(--radius-md);
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .modal-overlay {
+    padding: 6px;
+  }
+  .modal-content {
+    max-height: 96vh;
+    max-height: 96dvh;
+  }
+  .card {
+    padding: 12px;
+  }
 }

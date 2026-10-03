@@ -370,4 +370,39 @@ export default {
   padding: 16px 24px;
   border-top: 1px solid var(--border-subtle);
 }
+
+@media (max-width: 640px) {
+  .modal-body {
+    padding: 14px;
+  }
+  .pos-stats-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .modal-header {
+    padding: 8px 14px;
+  }
+  .modal-body {
+    padding: 8px 14px;
+  }
+  .pos-link-card {
+    margin-bottom: 8px;
+    padding: 8px 10px;
+  }
+  .pos-stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .demo-mgmt-section {
+    margin-top: 8px;
+    padding-top: 6px;
+  }
+  .modal-footer {
+    padding: 8px 14px;
+  }
+}
 </style>

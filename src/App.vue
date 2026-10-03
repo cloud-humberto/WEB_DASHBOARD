@@ -190,4 +190,25 @@ export default {
   font-size: 11px;
   color: var(--text-muted);
 }
+
+@media (max-width: 768px) {
+  .main-content {
+    padding: 12px 10px;
+    gap: 16px;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .main-content {
+    padding: 8px 14px;
+    gap: 12px;
+  }
+  .charts-row-primary {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px;
+  }
+  .section-charts {
+    gap: 10px;
+  }
+}
 </style>

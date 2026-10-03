@@ -150,4 +150,19 @@ export default {
   height: 280px;
   width: 100%;
 }
+
+@media (max-width: 640px) {
+  .canvas-wrapper {
+    height: 230px;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .canvas-wrapper {
+    height: 180px;
+  }
+  .chart-header {
+    margin-bottom: 6px;
+  }
+}
 </style>
