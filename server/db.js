@@ -1,40 +1,119 @@
 import 'dotenv/config';
-import { createClient } from '@libsql/client';
+import { createClient } from '@libsql/client/web';
+import { DatabaseSync } from 'node:sqlite';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const databaseUrl = process.env.TURSO_DATABASE_URL;
 const authToken = process.env.TURSO_AUTH_TOKEN;
-let client;
 
-function getClient() {
-  if (!databaseUrl) {
-    throw new Error('TURSO_DATABASE_URL is required to connect to the Turso database.');
-  }
-  if (!authToken) {
-    throw new Error('TURSO_AUTH_TOKEN is required to connect to the Turso database.');
-  }
-  if (!client) {
-    client = createClient({ url: databaseUrl, authToken });
-  }
-  return client;
+const isTurso = Boolean(databaseUrl);
+let tursoClient = null;
+let localSqliteDb = null;
+let localDbPath = null;
+
+export function isUsingTurso() {
+  return isTurso;
 }
 
-export async function queryAll(sql, args = []) {
-  const result = await getClient().execute({ sql, args });
-  return result.rows.map((row) => Object.fromEntries(
-    result.columns.map((column, index) => [column, row[index]])
-  ));
-}
+// Find candidate paths for local SQLite fallback
+const candidatePaths = [
+  path.resolve(__dirname, '../../pdv-vue2/server/database.sqlite'),
+  path.resolve(process.cwd(), '../pdv-vue2/server/database.sqlite'),
+  path.resolve(process.cwd(), 'pdv-vue2/server/database.sqlite'),
+  'C:/DEVS/Projects_JS/MyProjects_JS/pdv-vue2/server/database.sqlite',
+  path.resolve(__dirname, 'database.sqlite')
+];
 
-export async function queryOne(sql, args = []) {
-  return (await queryAll(sql, args))[0] || null;
-}
-
-export function execute(sql, args = []) {
-  return getClient().execute({ sql, args });
+function getLocalDbPath() {
+  if (localDbPath) return localDbPath;
+  for (const candidate of candidatePaths) {
+    if (fs.existsSync(candidate)) {
+      localDbPath = candidate;
+      return localDbPath;
+    }
+  }
+  localDbPath = candidatePaths[candidatePaths.length - 1];
+  return localDbPath;
 }
 
 export function getDatabasePath() {
-  return databaseUrl || 'TURSO_DATABASE_URL not configured';
+  if (isTurso) {
+    return databaseUrl;
+  }
+  return getLocalDbPath();
+}
+
+function getClient() {
+  if (isTurso) {
+    if (!authToken) {
+      throw new Error('TURSO_AUTH_TOKEN is required to connect to the Turso database.');
+    }
+    if (!tursoClient) {
+      tursoClient = createClient({ url: databaseUrl, authToken });
+    }
+    return tursoClient;
+  }
+
+  if (process.env.VERCEL) {
+    throw new Error('TURSO_DATABASE_URL is required when running serverless on Vercel.');
+  }
+
+  if (!localSqliteDb) {
+    const targetPath = getLocalDbPath();
+    localSqliteDb = new DatabaseSync(targetPath);
+    localSqliteDb.exec(`
+      PRAGMA journal_mode = WAL;
+      PRAGMA busy_timeout = 5000;
+      PRAGMA foreign_keys = ON;
+    `);
+  }
+  return localSqliteDb;
+}
+
+export async function queryAll(sql, args = []) {
+  if (isTurso) {
+    const client = getClient();
+    const result = await client.execute({ sql, args });
+    return result.rows.map((row) =>
+      Object.fromEntries(result.columns.map((column, index) => [column, row[index]]))
+    );
+  } else {
+    const db = getClient();
+    return db.prepare(sql).all(...args);
+  }
+}
+
+export async function queryOne(sql, args = []) {
+  if (isTurso) {
+    const rows = await queryAll(sql, args);
+    return rows[0] || null;
+  } else {
+    const db = getClient();
+    return db.prepare(sql).get(...args) || null;
+  }
+}
+
+export async function execute(sql, args = []) {
+  if (isTurso) {
+    const client = getClient();
+    const result = await client.execute({ sql, args });
+    return {
+      lastInsertRowid: result.lastInsertRowid !== undefined ? Number(result.lastInsertRowid) : null,
+      rowsAffected: result.rowsAffected
+    };
+  } else {
+    const db = getClient();
+    const result = db.prepare(sql).run(...args);
+    return {
+      lastInsertRowid: result.lastInsertRowid !== undefined ? Number(result.lastInsertRowid) : null,
+      rowsAffected: result.changes
+    };
+  }
 }
 
 async function seedExpenses() {
@@ -81,7 +160,7 @@ async function seedSales() {
 
       const itemsToPick = productsInDb.length > 0 
         ? [productsInDb[(i + s) % productsInDb.length], productsInDb[(i * 2 + s) % productsInDb.length]].filter(Boolean)
-        : [{ id: 1, name: 'Coca-Cola Classic', price: 1.75, barcode: '049000028904' }];
+        : [{ id: 1, name: 'Coca-Cola Classic 12oz Can', price: 1.75, barcode: '049000028904' }];
 
       let subtotal = 0;
       itemsToPick.forEach(p => {
@@ -203,26 +282,68 @@ async function initializeDatabase() {
     await execute(statement);
   }
 
+  // Seed default admin and cashier if users is empty
+  const userCount = await queryOne('SELECT COUNT(*) AS total FROM users');
+  if (!userCount || Number(userCount.total) === 0) {
+    await execute(`
+      INSERT INTO users (badge_code, username, name, pin_hash, role, max_discount)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, ['BADGE-9001', 'admin', 'STORE MANAGER', '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4', 'admin', 50.0]);
+    await execute(`
+      INSERT INTO users (badge_code, username, name, pin_hash, role, max_discount)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, ['BADGE-1002', 'clerk', 'CASHIER OPERATOR', '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8', 'cashier', 10.0]);
+  }
+
+  // Seed default products if products is empty
+  const prodCount = await queryOne('SELECT COUNT(*) AS total FROM products');
+  if (!prodCount || Number(prodCount.total) === 0) {
+    const initialCatalog = [
+      ['049000028904', 'Coca-Cola Classic 12oz Can', 1.75, 50, 'Beverages', 'EA'],
+      ['049000000443', 'Diet Coke 20oz Bottle', 2.25, 40, 'Beverages', 'EA'],
+      ['071142000018', 'Spring Water 16.9oz', 1.20, 100, 'Beverages', 'EA'],
+      ['611269000010', 'Red Bull Energy Drink 8.4oz', 3.50, 32, 'Beverages', 'EA'],
+      ['025000044005', 'Orange Juice 14oz Bottle', 2.80, 25, 'Beverages', 'EA'],
+      ['852084004012', 'Cold Brew Coffee 12oz', 3.95, 20, 'Beverages', 'EA'],
+      ['200000000001', 'Artisan Baguette', 3.50, 40, 'Bakery', 'EA'],
+      ['200000000002', 'Ham & Cheddar Croissant', 5.75, 18, 'Prepared Food', 'EA'],
+      ['200000000003', 'Blueberry Muffin', 2.95, 30, 'Bakery', 'EA'],
+      ['200000000004', 'Classic Glazed Donut', 1.50, 60, 'Bakery', 'EA'],
+      ['200000000005', 'Chicken Club Sandwich', 7.50, 15, 'Prepared Food', 'EA'],
+      ['028400000012', 'Potato Chips Sea Salt 5oz', 3.25, 35, 'Snacks', 'EA'],
+      ['034000002405', 'Milk Chocolate Bar 3.5oz', 2.10, 65, 'Candy', 'EA'],
+      ['030000061203', 'Chewy Granola Bar', 1.15, 80, 'Snacks', 'EA'],
+      ['022000004455', 'Peppermint Chewing Gum', 1.45, 90, 'Candy', 'EA'],
+      ['041143000023', 'Roasted Almonds 2.5oz', 4.25, 30, 'Snacks', 'EA']
+    ];
+    for (const item of initialCatalog) {
+      await execute(`
+        INSERT INTO products (barcode, name, price, stock, category, unit)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `, item);
+    }
+  }
+
   const settingRow = await queryOne("SELECT value FROM system_settings WHERE key = 'demo_cleared'");
   const isDemoCleared = settingRow ? settingRow.value === '1' : false;
 
   if (!process.env.VERCEL && !isDemoCleared) {
     const countExpenses = (await queryOne('SELECT COUNT(*) AS total FROM expenses')).total;
     if (countExpenses === 0) {
-      console.log('Seeding baseline operating expenses into Turso...');
+      console.log('Seeding baseline operating expenses into database...');
       await seedExpenses();
     }
 
     const countSales = (await queryOne('SELECT COUNT(*) AS total FROM sales')).total;
     if (countSales === 0) {
-      console.log('Seeding 30-day baseline retail sales into Turso...');
+      console.log('Seeding 30-day baseline retail sales into database...');
       await seedSales();
     }
   } else {
-    console.log('Demo data was explicitly purged. Keeping clean empty state.');
+    console.log('Demo data was explicitly purged or running in production clean mode.');
   }
 
-  console.log('Turso database ready.');
+  console.log(`✅ NovaMetrics database ready: ${getDatabasePath()}`);
 }
 
 let initialization;
@@ -244,7 +365,7 @@ export async function clearAllDemoData() {
   await execute('DELETE FROM sales');
   await execute('DELETE FROM expenses');
   await execute("INSERT OR REPLACE INTO system_settings (key, value) VALUES ('demo_cleared', '1')");
-  console.log('All mock sales, items, and expenses cleared from Turso.');
+  console.log('All mock sales, items, and expenses cleared.');
   return { success: true, message: 'All mock transactions cleared successfully.' };
 }
 
@@ -258,6 +379,6 @@ export async function seedDemoBaseline() {
   await execute("INSERT OR REPLACE INTO system_settings (key, value) VALUES ('demo_cleared', '0')");
   await seedExpenses();
   await seedSales();
-  console.log('Demo baseline sales and expenses re-seeded in Turso.');
+  console.log('Demo baseline sales and expenses re-seeded.');
   return { success: true, message: 'Demo baseline data successfully re-seeded.' };
 }

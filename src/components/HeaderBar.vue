@@ -112,7 +112,7 @@
 
       <div class="stats-preview mono text-muted">
         <span v-if="isSqlConnected" class="text-emerald">
-          🗄️ Shared SQLite Database: <code>pdv-vue2/server/database.sqlite</code>
+          🗄️ Database: <code>{{ dbPathDisplay }}</code>
         </span>
         <span v-else>
           IndexedDB Offline Persistence Active
@@ -138,23 +138,36 @@ export default {
     };
   },
   computed: {
-    ...mapState('finance', ['filterPeriod', 'isSqlConnected', 'posStatus']),
+    ...mapState('finance', ['filterPeriod', 'isSqlConnected', 'dbPath', 'posStatus']),
+
+    dbPathDisplay() {
+      if (!this.dbPath) return 'Connected';
+      if (this.dbPath.startsWith('libsql://') || this.dbPath.includes('turso.io')) {
+        const domain = this.dbPath.replace(/^libsql:\/\//, '').split('.')[0];
+        return `Turso Cloud (${domain})`;
+      }
+      return this.dbPath;
+    },
 
     statusClass() {
       if (!this.isSqlConnected) return 'offline';
+      if (this.dbPath && (this.dbPath.startsWith('libsql://') || this.dbPath.includes('turso.io'))) return 'online';
       if (this.posStatus && this.posStatus.isPosOnline) return 'online';
       return 'connected-db';
     },
 
     statusText() {
       if (!this.isSqlConnected) return 'Offline (IndexedDB)';
+      if (this.dbPath && (this.dbPath.startsWith('libsql://') || this.dbPath.includes('turso.io'))) {
+        return 'Turso libSQL Cloud Connected';
+      }
       if (this.posStatus && this.posStatus.isPosOnline) return 'NovaPOS Terminal Active (Port 3000/3001)';
       return 'Shared SQLite Connected';
     },
 
     statusTooltip() {
       if (this.isSqlConnected) {
-        return 'Connected to shared SQLite database at pdv-vue2/server/database.sqlite';
+        return `Connected to database: ${this.dbPath || 'Active'}`;
       }
       return 'Using local browser IndexedDB';
     }
