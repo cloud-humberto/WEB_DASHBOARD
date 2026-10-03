@@ -10,7 +10,7 @@ const rootDir = path.resolve(__dirname, '..');
 console.log('\x1b[36m====================================================\x1b[0m');
 console.log('\x1b[1m\x1b[32m   NOVAMETRICS - SAAS FINANCIAL & CASHFLOW ANALYTICS \x1b[0m');
 console.log('\x1b[36m====================================================\x1b[0m');
-console.log('⚡ Starting Shared SQLite Analytics Backend & Vue 2 Dashboard...\n');
+console.log('⚡ Starting Turso Analytics API & Vue 2 Dashboard...\n');
 
 const isWin = process.platform === 'win32';
 const nodeDir = path.dirname(process.execPath);
@@ -20,7 +20,7 @@ const currentPath = process.env.PATH || '';
 const newPath = currentPath.includes(nodeDir) ? currentPath : `${nodeDir};${currentPath}`;
 const env = { ...process.env, PATH: newPath };
 
-// 1. Start SQLite Backend Server (Port 3003)
+// 1. Start Turso API Server (Port 3003)
 const backendProcess = spawn(process.execPath, ['server/index.js'], {
   cwd: rootDir,
   stdio: 'inherit',

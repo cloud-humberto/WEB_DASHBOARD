@@ -1,6 +1,6 @@
-# 📈 NovaMetrics - SaaS Financial & Retail Cashflow Analytics (Vue 2 + IndexedDB + Chart.js)
+# 📈 NovaMetrics - SaaS Financial & Retail Cashflow Analytics (Vue 2 + Turso + Chart.js)
 
-> High-performance Financial Analytics & Cashflow Dashboard built with **Vue 2.7**, **Vuex 3**, **Chart.js 4**, **Offline-First IndexedDB**, and **Live NovaPOS SQLite Synchronization**.
+> Financial Analytics & Cashflow Dashboard built with **Vue 2.7**, **Vuex 3**, **Chart.js 4**, and a **Turso libSQL** database.
 
 ---
 
@@ -19,19 +19,20 @@ Launch the dashboard and browser automatically with a single click:
 
 ---
 
-## 🔗 Hybrid Architecture & Automatic NovaPOS Integration
+## ☁️ Turso and Vercel
 
-NovaMetrics is engineered with an **intelligent commercial data layer**:
+- The API uses `@libsql/client` and reads the database URL and auth token from `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN`.
+- On Vercel, the Express API is served by a serverless function under `/api`; the dashboard remains a Vite static build.
+- The database schema is initialized on the first API request. Production does not insert demo sales or expenses automatically; use the app's demo-data action only when wanted.
+- Keep the Turso auth token in environment variables. Never commit it or paste it into source files.
 
-### 1. 🔄 Automatic NovaPOS Discovery & Shared SQLite Database
-- **Zero-Config Auto-Detection**: When launched alongside **[NovaPOS Terminal (WEB_POS)](https://github.com/cloud-humberto/WEB_POS)**, the backend (`server/db.js`) automatically detects and connects directly to `pdv-vue2/server/database.sqlite`.
-- **Concurrent Multi-Process WAL Mode**: SQLite **Write-Ahead Logging** (`PRAGMA journal_mode = WAL;`) enables both NovaPOS and NovaMetrics to concurrently read and write to the same database file with zero file locking or conflicts.
-- **Real-Time Retail Feeds**: Every sale finalized in NovaPOS (`[F4] Tender`) is instantly queried by the dashboard—feeding Gross Inflow, top products, payment tender mix, and net profit margins without manual export/import.
-- **Live Terminal Monitor**: The top header badge dynamically detects if the NovaPOS terminal is actively running (`🟢 NovaPOS Terminal Active`) or stopped (`🔵 Shared SQLite Connected`).
+### Configure deployment
 
-### 2. 🛡️ 100% Standalone Autonomy (SQLite + IndexedDB Fallback)
-- **Runs Completely Alone**: If NovaPOS is not present, NovaMetrics automatically creates its own independent SQLite database (`server/database.sqlite`) with complete commercial schemas (`products`, `sales`, `sale_items`, `expenses`, `users`) and seeded baseline data.
-- **Static / Serverless Fallback**: If the Node.js backend is offline (e.g. static preview or GitHub Pages), the dashboard seamlessly switches to browser-native **IndexedDB** (`NovaMetricsDB`).
+1. Create your own database in Turso, then create its auth token with `turso db tokens create <your-database-name>`.
+2. In Vercel, open **Project Settings → Environment Variables** and add `TURSO_DATABASE_URL` with your database URL and `TURSO_AUTH_TOKEN` with its token. Set both for Production (and Preview if needed).
+3. Deploy the project. Vercel builds the frontend with `npm run build` and routes `/api/*` to the serverless Express API.
+
+For local development, copy `.env.example` to `.env`, replace the example URL with your own and add its token, then run `npm start`. Both variables are required, and `.env` is excluded from git.
 
 ### 3. 🧹 Clean Store Deployment & Mock Data Purge (Reset to $0.00)
 - **Out-of-the-Box Demo Baseline**: Upon fresh installation or initial test run, the app includes 30 days of mock sales and expenses so you can test charts, filters, and reports immediately without having to enter data manually.
@@ -79,8 +80,8 @@ cd finance-dashboard
 # 2. Install dependencies
 npm install
 
-# 3. Start development server
-npm run dev
+# 3. Configure Turso credentials in .env, then start API and dashboard
+npm start
 # Dashboard opens on http://localhost:3002
 
 # 4. Build for production
@@ -96,7 +97,7 @@ npm run build
 | **Framework** | Vue 2.7 (Naruto - Composition API & Vite support) |
 | **State Management** | Vuex 3.6 (Modular store architecture: `finance`, `pos`) |
 | **Charts** | Chart.js 4.4 (Canvas 2D render loop, custom tooltips & gradients) |
-| **Storage Engine** | Browser Native IndexedDB (Transactions, Settings) |
+| **Storage Engine** | Turso libSQL via server API; IndexedDB fallback |
 | **Styling** | Industrial Fintech Dark UI (Tailored CSS Variables, JetBrains Mono, Plus Jakarta Sans) |
 | **Document Export** | jsPDF 4.2 (Vector PDF generation), UTF-8 CSV Generator |
 | **Tooling** | Vite 5 + `@vitejs/plugin-vue2` |

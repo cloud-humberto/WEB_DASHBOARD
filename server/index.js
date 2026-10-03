@@ -1,21 +1,31 @@
 import express from 'express';
 import cors from 'cors';
 import http from 'node:http';
-import { db, initSharedDatabase, getDatabasePath, clearAllDemoData, seedDemoBaseline } from './db.js';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { queryAll, queryOne, execute, initSharedDatabase, getDatabasePath, clearAllDemoData, seedDemoBaseline } from './db.js';
 
 const app = express();
-const PORT = 3003;
 
 app.use(cors());
 app.use(express.json());
 
-// Initialize shared SQLite schema & seed baseline
-initSharedDatabase();
+app.use('/api', async (req, res, next) => {
+  try {
+    await initSharedDatabase();
+    next();
+  } catch (error) {
+    console.error('Turso database initialization failed:', error);
+    res.status(500).json({ error: 'Turso database initialization failed' });
+  }
+});
 
 /**
  * Helper to probe if NovaPOS backend is running on port 3001
  */
 function probePosTerminal() {
+  if (process.env.VERCEL) return Promise.resolve(false);
+
   return new Promise((resolve) => {
     const req = http.get('http://localhost:3001/api/reports/daily', { timeout: 1000 }, (res) => {
       resolve(res.statusCode === 200);
@@ -46,19 +56,21 @@ function getDateFilterClause(period, fieldName) {
 app.get('/api/status', async (req, res) => {
   try {
     const isPosOnline = await probePosTerminal();
-    const salesCount = db.prepare('SELECT COUNT(*) AS total FROM sales').get().total;
-    const expensesCount = db.prepare('SELECT COUNT(*) AS total FROM expenses').get().total;
-    const productsCount = db.prepare('SELECT COUNT(*) AS total FROM products').get().total;
-    const lastSale = db.prepare('SELECT id, sale_number, total_amount, created_at, operator_name FROM sales ORDER BY id DESC LIMIT 1').get() || null;
+    const [sales, expenses, products, lastSale] = await Promise.all([
+      queryOne('SELECT COUNT(*) AS total FROM sales'),
+      queryOne('SELECT COUNT(*) AS total FROM expenses'),
+      queryOne('SELECT COUNT(*) AS total FROM products'),
+      queryOne('SELECT id, sale_number, total_amount, created_at, operator_name FROM sales ORDER BY id DESC LIMIT 1')
+    ]);
 
     res.json({
       online: true,
       dbPath: getDatabasePath(),
       isPosOnline,
       stats: {
-        salesCount,
-        expensesCount,
-        productsCount
+        salesCount: sales.total,
+        expensesCount: expenses.total,
+        productsCount: products.total
       },
       lastSale
     });
@@ -67,14 +79,14 @@ app.get('/api/status', async (req, res) => {
   }
 });
 
-// 2. Executive KPIs (Calculated from SQLite)
-app.get('/api/kpis', (req, res) => {
+// 2. Executive KPIs (Calculated from Turso)
+app.get('/api/kpis', async (req, res) => {
   try {
     const period = req.query.period || '30d';
     const salesFilter = getDateFilterClause(period, 'created_at');
     const expensesFilter = getDateFilterClause(period, 'date');
 
-    const salesStats = db.prepare(`
+    const salesStats = await queryOne(`
       SELECT 
         COALESCE(SUM(total_amount), 0) AS totalRevenue,
         COALESCE(AVG(total_amount), 0) AS avgTicket,
@@ -83,15 +95,15 @@ app.get('/api/kpis', (req, res) => {
         COUNT(*) AS revenueCount
       FROM sales
       WHERE ${salesFilter}
-    `).get();
+    `);
 
-    const expenseStats = db.prepare(`
+    const expenseStats = await queryOne(`
       SELECT 
         COALESCE(SUM(amount), 0) AS totalExpenses,
         COUNT(*) AS expenseCount
       FROM expenses
       WHERE ${expensesFilter}
-    `).get();
+    `);
 
     const totalRevenue = Number(salesStats.totalRevenue) || 0;
     const totalExpenses = Number(expenseStats.totalExpenses) || 0;
@@ -116,14 +128,14 @@ app.get('/api/kpis', (req, res) => {
   }
 });
 
-// 3. Cashflow Evolution Timeline (From SQLite sales & expenses)
-app.get('/api/charts/cashflow', (req, res) => {
+// 3. Cashflow Evolution Timeline (From Turso sales & expenses)
+app.get('/api/charts/cashflow', async (req, res) => {
   try {
     const period = req.query.period || '30d';
     const salesFilter = getDateFilterClause(period, 'created_at');
     const expensesFilter = getDateFilterClause(period, 'date');
 
-    const salesByDay = db.prepare(`
+    const salesByDay = await queryAll(`
       SELECT 
         strftime('%Y-%m-%d', created_at) AS day,
         SUM(total_amount) AS total
@@ -131,9 +143,9 @@ app.get('/api/charts/cashflow', (req, res) => {
       WHERE ${salesFilter}
       GROUP BY day
       ORDER BY day ASC
-    `).all();
+    `);
 
-    const expensesByDay = db.prepare(`
+    const expensesByDay = await queryAll(`
       SELECT 
         strftime('%Y-%m-%d', date) AS day,
         SUM(amount) AS total
@@ -141,7 +153,7 @@ app.get('/api/charts/cashflow', (req, res) => {
       WHERE ${expensesFilter}
       GROUP BY day
       ORDER BY day ASC
-    `).all();
+    `);
 
     const map = new Map();
 
@@ -177,13 +189,13 @@ app.get('/api/charts/cashflow', (req, res) => {
   }
 });
 
-// 4. Payment Method Tender Mix (From SQLite sales)
-app.get('/api/charts/payment-methods', (req, res) => {
+// 4. Payment Method Tender Mix (From Turso sales)
+app.get('/api/charts/payment-methods', async (req, res) => {
   try {
     const period = req.query.period || '30d';
     const salesFilter = getDateFilterClause(period, 'created_at');
 
-    const rows = db.prepare(`
+    const rows = await queryAll(`
       SELECT 
         payment_method,
         SUM(total_amount) AS total,
@@ -192,7 +204,7 @@ app.get('/api/charts/payment-methods', (req, res) => {
       WHERE ${salesFilter}
       GROUP BY payment_method
       ORDER BY total DESC
-    `).all();
+    `);
 
     const labels = rows.map(r => r.payment_method);
     const values = rows.map(r => Number((r.total || 0).toFixed(2)));
@@ -203,14 +215,14 @@ app.get('/api/charts/payment-methods', (req, res) => {
   }
 });
 
-// 5. Category Breakdown (From SQLite sale_items + products & expenses)
-app.get('/api/charts/categories', (req, res) => {
+// 5. Category Breakdown (From Turso sale_items + products & expenses)
+app.get('/api/charts/categories', async (req, res) => {
   try {
     const period = req.query.period || '30d';
     const salesFilter = getDateFilterClause(period, 's.created_at');
     const expensesFilter = getDateFilterClause(period, 'date');
 
-    const salesByCat = db.prepare(`
+    const salesByCat = await queryAll(`
       SELECT 
         COALESCE(p.category, 'General') AS cat,
         SUM(si.total) AS total
@@ -220,9 +232,9 @@ app.get('/api/charts/categories', (req, res) => {
       WHERE ${salesFilter}
       GROUP BY cat
       ORDER BY total DESC
-    `).all();
+    `);
 
-    const expensesByCat = db.prepare(`
+    const expensesByCat = await queryAll(`
       SELECT 
         category AS cat,
         SUM(amount) AS total
@@ -230,7 +242,7 @@ app.get('/api/charts/categories', (req, res) => {
       WHERE ${expensesFilter}
       GROUP BY cat
       ORDER BY total DESC
-    `).all();
+    `);
 
     const categoryMap = new Map();
 
@@ -255,13 +267,13 @@ app.get('/api/charts/categories', (req, res) => {
 });
 
 // 6. Unified Ledger Transactions (Sales + Expenses)
-app.get('/api/transactions', (req, res) => {
+app.get('/api/transactions', async (req, res) => {
   try {
     const period = req.query.period || 'all';
     const salesFilter = getDateFilterClause(period, 'created_at');
     const expensesFilter = getDateFilterClause(period, 'date');
 
-    const sales = db.prepare(`
+    const sales = await queryAll(`
       SELECT 
         id,
         'revenue' AS type,
@@ -274,9 +286,9 @@ app.get('/api/transactions', (req, res) => {
         operator_name AS operator
       FROM sales
       WHERE ${salesFilter}
-    `).all();
+    `);
 
-    const expenses = db.prepare(`
+    const expenses = await queryAll(`
       SELECT 
         id,
         'expense' AS type,
@@ -289,7 +301,7 @@ app.get('/api/transactions', (req, res) => {
         operator
       FROM expenses
       WHERE ${expensesFilter}
-    `).all();
+    `);
 
     const allTransactions = [...sales, ...expenses].sort(
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
@@ -301,29 +313,27 @@ app.get('/api/transactions', (req, res) => {
   }
 });
 
-// 7. Add Operating Expense (Stored directly in SQLite)
-app.post('/api/expenses', (req, res) => {
+// 7. Add Operating Expense (Stored directly in Turso)
+app.post('/api/expenses', async (req, res) => {
   try {
     const { category, description, amount, payment_method, date, operator } = req.body;
     if (!description || !amount) {
       return res.status(400).json({ error: 'Missing required expense fields' });
     }
 
-    const stmt = db.prepare(`
+    const result = await execute(`
       INSERT INTO expenses (category, description, amount, payment_method, date, operator)
       VALUES (?, ?, ?, ?, ?, ?)
-    `);
-
-    const result = stmt.run(
+    `, [
       category || 'Other Overhead',
       description.trim(),
       Number(amount),
       payment_method || 'Bank Transfer',
       date || new Date().toISOString(),
       operator || 'STORE MANAGER'
-    );
+    ]);
 
-    const newExpense = db.prepare('SELECT * FROM expenses WHERE id = ?').get(result.lastInsertRowid);
+    const newExpense = await queryOne('SELECT * FROM expenses WHERE id = ?', [Number(result.lastInsertRowid)]);
     res.json({ success: true, expense: newExpense });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -331,10 +341,10 @@ app.post('/api/expenses', (req, res) => {
 });
 
 // 8. Delete Operating Expense
-app.delete('/api/expenses/:id', (req, res) => {
+app.delete('/api/expenses/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    db.prepare('DELETE FROM expenses WHERE id = ?').run(Number(id));
+    await execute('DELETE FROM expenses WHERE id = ?', [Number(id)]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -342,9 +352,9 @@ app.delete('/api/expenses/:id', (req, res) => {
 });
 
 // 9. Clear all demo / mock sales and expenses
-app.post('/api/clear-demo-data', (req, res) => {
+app.post('/api/clear-demo-data', async (req, res) => {
   try {
-    const result = clearAllDemoData();
+    const result = await clearAllDemoData();
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -352,16 +362,24 @@ app.post('/api/clear-demo-data', (req, res) => {
 });
 
 // 10. Re-seed demo baseline data
-app.post('/api/seed-demo-data', (req, res) => {
+app.post('/api/seed-demo-data', async (req, res) => {
   try {
-    const result = seedDemoBaseline();
+    const result = await seedDemoBaseline();
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`⚡ NovaMetrics Analytics SQL Backend running on http://localhost:${PORT}`);
-  console.log(`📂 Connected to SQLite Database: ${getDatabasePath()}`);
-});
+export default app;
+
+const isMainModule = process.argv[1]
+  && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
+
+if (isMainModule) {
+  const port = Number(process.env.PORT) || 3003;
+  app.listen(port, () => {
+    console.log(`NovaMetrics API running on http://localhost:${port}`);
+    console.log(`Connected to Turso database: ${getDatabasePath()}`);
+  });
+}
